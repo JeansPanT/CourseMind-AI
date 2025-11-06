@@ -1,0 +1,68 @@
+package org.coursemind.service;
+
+import org.coursemind.DAO.QuestionRepo;
+import org.coursemind.DAO.TopicRepo;
+import org.coursemind.Model.QuestionsWrapper;
+import org.coursemind.Model.Topic;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+
+@Service
+public class QuestionGenerater {
+    private final AiService service;
+    private final TopicRepo topicRepository;
+    private final QuestionRepo questionsWrapperRepository;
+
+    public QuestionGenerater(AiService service, TopicRepo topicRepository, QuestionRepo questionsWrapperRepository) {
+        this.service = service;
+        this.topicRepository = topicRepository;
+        this.questionsWrapperRepository = questionsWrapperRepository;
+    }
+
+    static final int number=10;
+
+    public ResponseEntity<String> generated(String topicName){
+        String prompt = "Generate " + number + " multiple choice questions (MCQs) on the topic: "
+                + topicName + ".\n"
+                + "Strictly use the following format for each question:\n\n"
+                + "Question: <question text>\n"
+                + "A) <option A>\n"
+                + "B) <option B>\n"
+                + "C) <option C>\n"
+                + "D) <option D>\n"
+                + "Answer: <correct option letter>\n\n"
+                + "Do not include explanations, only follow this exact format for each question.";
+
+
+        String response = service.getResponse(prompt);
+        Topic topic = new Topic();
+        topic.setName(topicName);
+        topicRepository.save(topic);
+
+
+        String[] questionsArray = response.split("Question:");
+        for (String qBlock : questionsArray) {
+            if (qBlock.trim().isEmpty()) continue;
+
+            String[] lines = qBlock.trim().split("\n");
+            QuestionsWrapper q = new QuestionsWrapper();
+
+            q.setQuestion(lines[0].trim());
+
+            for (String line : lines) {
+                if (line.startsWith("A)")) q.setOptionA(line.substring(2).trim());
+                else if (line.startsWith("B)")) q.setOptionB(line.substring(2).trim());
+                else if (line.startsWith("C)")) q.setOptionC(line.substring(2).trim());
+                else if (line.startsWith("D)")) q.setOptionD(line.substring(2).trim());
+                else if (line.startsWith("Answer:")) q.setAnswer(line.substring(7).trim());
+            }
+
+            q.setTopic(topic);
+            questionsWrapperRepository.save(q);
+        }
+        return new ResponseEntity<>("Ok", HttpStatus.OK);
+
+    }
+}
