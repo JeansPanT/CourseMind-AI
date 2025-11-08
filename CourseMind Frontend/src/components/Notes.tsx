@@ -21,11 +21,29 @@ export default function Notes() {
     if (result.error) {
       setError(result.error);
     } else if (result.data) {
-      // Ensure result.data is always an array
       setNotes(Array.isArray(result.data) ? result.data : [result.data]);
     }
 
     setLoading(false);
+  };
+
+  // --- Function to render styled HTML manually ---
+  const formatNote = (text: string) => {
+    if (!text) return '';
+
+    return text
+      // Bold **text**
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      // Italics *text*
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      // Bullet points (- or *)
+      .replace(/(^|\n)[*-]\s+(.*)/g, '$1• $2')
+      // Headings (#, ##, ###)
+      .replace(/^###\s?(.*)$/gm, '<h3 class="text-lg font-semibold mt-3">$1</h3>')
+      .replace(/^##\s?(.*)$/gm, '<h2 class="text-xl font-bold mt-4">$1</h2>')
+      .replace(/^#\s?(.*)$/gm, '<h1 class="text-2xl font-bold mt-5">$1</h1>')
+      // Line breaks
+      .replace(/\n/g, '<br />');
   };
 
   return (
@@ -97,11 +115,12 @@ export default function Notes() {
                     {note.topic}
                   </h3>
                 </div>
-                <div className="bg-white/60 backdrop-blur rounded-xl p-6 border border-sky-200/50">
-                  <p className="text-slate-700 whitespace-pre-wrap leading-relaxed font-light text-base">
-                    {note.note}
-                  </p>
-                </div>
+
+                {/* Formatted HTML note */}
+                <div
+                  className="bg-white/60 backdrop-blur rounded-xl p-6 border border-sky-200/50 text-slate-700 leading-relaxed font-light text-base prose max-w-none"
+                  dangerouslySetInnerHTML={{ __html: formatNote(note.note) }}
+                />
               </div>
             ))}
           </div>
