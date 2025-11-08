@@ -63,12 +63,12 @@ spring.jpa.hibernate.ddl-auto=update
 
 ```
 
-### 3️⃣ Add OpenAI API Key
+### 3️⃣ Add OlamaAI Local Server URL
 ```properties
 # AI
-spring.ai.openai.api-key=${OPENAI_API_KEY}
-spring.ai.openai.chat.model=${OPENAI_CHAT_MODEL}
-
+spring.ai.ollama.base-url=${URL}
+spring.ai.ollama.chat.model=${OLLAMA_MODEL}
+spring.ai.ollama.timeout=60s
 ```
 
 ### 4️⃣ Configure Email Settings
