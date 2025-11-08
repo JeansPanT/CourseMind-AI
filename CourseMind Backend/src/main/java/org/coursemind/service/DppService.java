@@ -34,23 +34,17 @@ public class DppService {
      * Each DPP contains shuffled MCQs to ensure variety per request.
      */
     public List<Questions> dppGenerator(String topicName) {
-        // ✅ Auto-generate topic if not found
         if (!topicRepo.existsByName(topicName)) {
             generator.generated(topicName);
         }
 
-        // ✅ Fetch the topic entity safely
         Topic topicEntity = topicRepo.findByName(topicName)
                 .orElseThrow(() -> new RuntimeException("Topic not found: " + topicName));
 
-        // ✅ Fetch all questions for the topic
-        List<QuestionsWrapper> wrappers = questionRepo.findByTopic(topicEntity);
-        if (wrappers.isEmpty()) {
-            throw new RuntimeException("No questions found for topic: " + topicName);
-        }
+        List<QuestionsWrapper> questionsWrapperList = questionRepo.findByTopic(topicEntity);
+        List<Questions> questionsList = new ArrayList<>();
 
-        // ✅ Convert wrappers into display-friendly questions
-        List<Questions> questionsList = wrappers.stream().map(wrapper -> {
+        for (QuestionsWrapper wrapper : questionsWrapperList) {
             Questions q = new Questions();
             q.setId(wrapper.getId());
             q.setQuestion(wrapper.getQuestion());
@@ -58,13 +52,52 @@ public class DppService {
             q.setOptionB(wrapper.getOptionB());
             q.setOptionC(wrapper.getOptionC());
             q.setOptionD(wrapper.getOptionD());
-            q.setAnswer(wrapper.getAnswer());
-            return q;
-        }).collect(Collectors.toList());
 
-        // ✅ Shuffle and limit (e.g., 5 questions per DPP)
+            // 👇 Add all options as a list for frontend rendering
+            List<String> options = List.of(
+                    wrapper.getOptionA(),
+                    wrapper.getOptionB(),
+                    wrapper.getOptionC(),
+                    wrapper.getOptionD()
+            );
+            q.setOptions(options);
+
+            // ✅ Normalize the stored answer
+            // If DB stores letters (A/B/C/D), map to actual option text
+            String storedAnswer = wrapper.getAnswer();
+            if (storedAnswer != null) {
+                storedAnswer = storedAnswer.trim();
+                if (storedAnswer.length() == 1) {
+                    char c = Character.toUpperCase(storedAnswer.charAt(0));
+                    int idx = switch (c) {
+                        case 'A' -> 0;
+                        case 'B' -> 1;
+                        case 'C' -> 2;
+                        case 'D' -> 3;
+                        default -> -1;
+                    };
+                    if (idx >= 0 && idx < options.size()) {
+                        q.setAnswer(options.get(idx)); // store full option text
+                    } else {
+                        q.setAnswer(storedAnswer);
+                    }
+                } else {
+                    // assume full answer text is already stored
+                    q.setAnswer(storedAnswer);
+                }
+            }
+
+            questionsList.add(q);
+        }
+
+        // 🔀 Shuffle to make every DPP unique
         Collections.shuffle(questionsList);
-        return questionsList.stream().limit(Math.min(5, questionsList.size())).collect(Collectors.toList());
+
+        // 📉 Limit to 5 questions (optional)
+        int limit = Math.min(5, questionsList.size());
+        return questionsList.stream()
+                .limit(limit)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -77,10 +110,11 @@ public class DppService {
         for (int i = 0; i < questions.size(); i++) {
             Questions q = questions.get(i);
             content.append(i + 1).append(". ").append(q.getQuestion()).append("\n")
-                   .append("A) ").append(q.getOptionA()).append("\n")
-                   .append("B) ").append(q.getOptionB()).append("\n")
-                   .append("C) ").append(q.getOptionC()).append("\n")
-                   .append("D) ").append(q.getOptionD()).append("\n\n");
+                    .append("A) ").append(q.getOptionA()).append("\n")
+                    .append("B) ").append(q.getOptionB()).append("\n")
+                    .append("C) ").append(q.getOptionC()).append("\n")
+                    .append("D) ").append(q.getOptionD()).append("\n")
+                    .append("✅ Correct Answer: ").append(q.getAnswer()).append("\n\n");
         }
 
         SimpleMailMessage message = new SimpleMailMessage();
