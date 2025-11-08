@@ -55,8 +55,8 @@ public class TestService {
     }
     public void sendMail(String topic, List<Questions> questionsList) {
         SimpleMailMessage message=new SimpleMailMessage();
-        message.setTo("tornovdutta20@gmail.com");
-        message.setFrom("tornovdutta@gmail.com");
+        message.setTo("jeanspant101@gmail.com");
+        message.setFrom("siddhukar39@gmail.com");
         message.setText("Dpp start on "+topic+"/n"+questionsList);
         message.setSubject("Remainder");
         mail.send(message);

@@ -12,10 +12,15 @@ export interface NoteResponse {
 }
 
 export interface Question {
+  id: number;
   question: string;
-  options?: string[];
-  answer?: string;
+  optionA: string;
+  optionB: string;
+  optionC: string;
+  optionD: string;
+  answer: string;
 }
+
 
 export interface TestResponse {
   topic: string;
@@ -97,11 +102,13 @@ class ApiService {
   }
 
   async generateDPP(topic: string): Promise<ApiResponse<DPPResponse>> {
-    return this.fetchWithErrorHandling<DPPResponse>(`${API_BASE_URL}/dpp`, {
-      method: 'POST',
-      body: JSON.stringify({ topic }),
-    });
-  }
+  return this.fetchWithErrorHandling<DPPResponse>(`${API_BASE_URL}/dpp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ topic })  // <-- important: send an object, not a raw string
+  });
+}
+
 
   async scheduleDPP(
     data: ScheduleDPPRequest
