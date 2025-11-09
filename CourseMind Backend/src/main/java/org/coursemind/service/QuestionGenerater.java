@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.util.regex.*;
+
 @Service
 public class QuestionGenerater {
     private final AiService service;
@@ -35,8 +37,8 @@ public class QuestionGenerater {
                 + "Do not include explanations, only follow this exact format for each question.";
 
         String response = service.getResponse(prompt);
-        
-        // FIX: Check if topic already exists, if not create new one
+
+        // Ensure topic exists or create new
         Topic topic = topicRepository.findByName(topicName)
                 .orElseGet(() -> {
                     Topic newTopic = new Topic();
@@ -44,39 +46,43 @@ public class QuestionGenerater {
                     return topicRepository.save(newTopic);
                 });
 
-        String[] questionsArray = response.split("Question:");
-        for (String qBlock : questionsArray) {
-            if (qBlock.trim().isEmpty()) continue;
+        System.out.println("🧠 Raw AI output:\n" + response);
 
-            String[] lines = qBlock.trim().split("\n");
+        // Split questions by "Question:"
+        String[] questionsArray = response.split("(?=Question[:\\s])");
+        for (String qBlock : questionsArray) {
+            qBlock = qBlock.trim();
+            if (qBlock.isEmpty()) continue;
+
             QuestionsWrapper q = new QuestionsWrapper();
 
-            // First line is the question
-            if (lines.length > 0) {
-                q.setQuestion(lines[0].trim());
+            // Extract question line
+            Matcher questionMatcher = Pattern.compile("Question[:\\s]+(.*?)(?:\\n|$)").matcher(qBlock);
+            if (questionMatcher.find()) {
+                q.setQuestion(questionMatcher.group(1).trim());
             }
 
-            // Parse options and answer
-            for (String line : lines) {
-                line = line.trim();
-                if (line.startsWith("A)")) {
-                    q.setOptionA(line.substring(2).trim());
-                } else if (line.startsWith("B)")) {
-                    q.setOptionB(line.substring(2).trim());
-                } else if (line.startsWith("C)")) {
-                    q.setOptionC(line.substring(2).trim());
-                } else if (line.startsWith("D)")) {
-                    q.setOptionD(line.substring(2).trim());
-                } else if (line.startsWith("Answer:")) {
-                    String answerText = line.substring(7).trim();
-                    // Extract just the letter (A, B, C, or D)
-                    if (answerText.length() > 0) {
-                        q.setAnswer(answerText.substring(0, 1).toUpperCase());
-                    }
+            // Extract all options (A–D)
+            Matcher optionMatcher = Pattern.compile("([A-D])[\\)\\.\\s]+(.*)").matcher(qBlock);
+            while (optionMatcher.find()) {
+                String letter = optionMatcher.group(1);
+                String value = optionMatcher.group(2).trim();
+                switch (letter) {
+                    case "A" -> q.setOptionA(value);
+                    case "B" -> q.setOptionB(value);
+                    case "C" -> q.setOptionC(value);
+                    case "D" -> q.setOptionD(value);
                 }
             }
 
+            // Extract the correct answer
+            Matcher answerMatcher = Pattern.compile("Answer[:\\s-]+([A-Da-d])").matcher(qBlock);
+            if (answerMatcher.find()) {
+                q.setAnswer(answerMatcher.group(1).toUpperCase());
+            }
+
             // Debug logging
+            System.out.println("──────────────────────────────");
             System.out.println("Question: " + q.getQuestion());
             System.out.println("Option A: " + q.getOptionA());
             System.out.println("Option B: " + q.getOptionB());
@@ -84,18 +90,18 @@ public class QuestionGenerater {
             System.out.println("Option D: " + q.getOptionD());
             System.out.println("Answer: " + q.getAnswer());
 
-            // Only save if we have all required fields
-            if (q.getQuestion() != null && q.getOptionA() != null && 
-                q.getOptionB() != null && q.getOptionC() != null && 
+            // Save only valid questions
+            if (q.getQuestion() != null && q.getOptionA() != null &&
+                q.getOptionB() != null && q.getOptionC() != null &&
                 q.getOptionD() != null && q.getAnswer() != null) {
                 q.setTopic(topic);
                 questionsWrapperRepository.save(q);
-                System.out.println("✓ Question saved successfully");
+                System.out.println("✅ Question saved successfully");
             } else {
-                System.out.println("✗ Question skipped - missing fields");
+                System.out.println("⚠️ Skipped malformed question block:\n" + qBlock);
             }
         }
-        
+
         return new ResponseEntity<>("Ok", HttpStatus.OK);
     }
 }
