@@ -27,6 +27,7 @@
 
   body {
     @apply bg-slate-50 text-slate-900 font-sans;
+    transition: background-color 1s, color 1s;
   }
 
   * {
