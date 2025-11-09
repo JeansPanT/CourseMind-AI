@@ -4,10 +4,9 @@ import org.coursemind.DAO.QuestionRepo;
 import org.coursemind.DAO.TopicRepo;
 import org.coursemind.Model.QuestionsWrapper;
 import org.coursemind.Model.Topic;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Service;
 
 @Service
 public class QuestionGenerater {
@@ -21,9 +20,9 @@ public class QuestionGenerater {
         this.questionsWrapperRepository = questionsWrapperRepository;
     }
 
-    static final int number=10;
+    static final int number = 10;
 
-    public ResponseEntity<String> generated(String topicName){
+    public ResponseEntity<String> generated(String topicName) {
         String prompt = "Generate " + number + " multiple choice questions (MCQs) on the topic: "
                 + topicName + ".\n"
                 + "Strictly use the following format for each question:\n\n"
@@ -35,12 +34,15 @@ public class QuestionGenerater {
                 + "Answer: <correct option letter>\n\n"
                 + "Do not include explanations, only follow this exact format for each question.";
 
-
         String response = service.getResponse(prompt);
-        Topic topic = new Topic();
-        topic.setName(topicName);
-        topicRepository.save(topic);
-
+        
+        // FIX: Check if topic already exists, if not create new one
+        Topic topic = topicRepository.findByName(topicName)
+                .orElseGet(() -> {
+                    Topic newTopic = new Topic();
+                    newTopic.setName(topicName);
+                    return topicRepository.save(newTopic);
+                });
 
         String[] questionsArray = response.split("Question:");
         for (String qBlock : questionsArray) {
@@ -49,20 +51,51 @@ public class QuestionGenerater {
             String[] lines = qBlock.trim().split("\n");
             QuestionsWrapper q = new QuestionsWrapper();
 
-            q.setQuestion(lines[0].trim());
-
-            for (String line : lines) {
-                if (line.startsWith("A)")) q.setOptionA(line.substring(2).trim());
-                else if (line.startsWith("B)")) q.setOptionB(line.substring(2).trim());
-                else if (line.startsWith("C)")) q.setOptionC(line.substring(2).trim());
-                else if (line.startsWith("D)")) q.setOptionD(line.substring(2).trim());
-                else if (line.startsWith("Answer:")) q.setAnswer(line.substring(7).trim());
+            // First line is the question
+            if (lines.length > 0) {
+                q.setQuestion(lines[0].trim());
             }
 
-            q.setTopic(topic);
-            questionsWrapperRepository.save(q);
-        }
-        return new ResponseEntity<>("Ok", HttpStatus.OK);
+            // Parse options and answer
+            for (String line : lines) {
+                line = line.trim();
+                if (line.startsWith("A)")) {
+                    q.setOptionA(line.substring(2).trim());
+                } else if (line.startsWith("B)")) {
+                    q.setOptionB(line.substring(2).trim());
+                } else if (line.startsWith("C)")) {
+                    q.setOptionC(line.substring(2).trim());
+                } else if (line.startsWith("D)")) {
+                    q.setOptionD(line.substring(2).trim());
+                } else if (line.startsWith("Answer:")) {
+                    String answerText = line.substring(7).trim();
+                    // Extract just the letter (A, B, C, or D)
+                    if (answerText.length() > 0) {
+                        q.setAnswer(answerText.substring(0, 1).toUpperCase());
+                    }
+                }
+            }
 
+            // Debug logging
+            System.out.println("Question: " + q.getQuestion());
+            System.out.println("Option A: " + q.getOptionA());
+            System.out.println("Option B: " + q.getOptionB());
+            System.out.println("Option C: " + q.getOptionC());
+            System.out.println("Option D: " + q.getOptionD());
+            System.out.println("Answer: " + q.getAnswer());
+
+            // Only save if we have all required fields
+            if (q.getQuestion() != null && q.getOptionA() != null && 
+                q.getOptionB() != null && q.getOptionC() != null && 
+                q.getOptionD() != null && q.getAnswer() != null) {
+                q.setTopic(topic);
+                questionsWrapperRepository.save(q);
+                System.out.println("✓ Question saved successfully");
+            } else {
+                System.out.println("✗ Question skipped - missing fields");
+            }
+        }
+        
+        return new ResponseEntity<>("Ok", HttpStatus.OK);
     }
 }

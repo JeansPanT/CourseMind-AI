@@ -1,18 +1,16 @@
 package org.coursemind.controller;
 
-
 import org.coursemind.Model.Questions;
 import org.coursemind.Model.Status;
 import org.coursemind.Model.TestRequested;
+import org.coursemind.Model.TestResponse;  // Add this import
 import org.coursemind.config.DynamicSchedule;
 import org.coursemind.service.TestService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
-
 import java.util.List;
 
 @CrossOrigin(origins = "http://localhost:5173")
@@ -30,8 +28,14 @@ public class TestController {
     }
 
     @PostMapping("")
-    public ResponseEntity<List<Questions>> create(@RequestBody TestRequested request){
-        return new ResponseEntity<>(service.testGenerator(request.getTopic()), HttpStatus.OK);
+    public ResponseEntity<TestResponse> create(@RequestBody TestRequested request){
+        // Get the questions from service
+        List<Questions> questions = service.testGenerator(request.getTopic());
+        
+        // Wrap in TestResponse object
+        TestResponse response = new TestResponse(request.getTopic(), questions);
+        
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
     @PostMapping("/schedule")
@@ -40,22 +44,20 @@ public class TestController {
         LocalDateTime dateTime = LocalDateTime.of(testRequested.getDate(), testRequested.getTime());
 
         dynamicScheduler.schedule(() -> {
-
-            List<Questions> questions=service.testGenerator(topic);
-            service.sendMail(topic,questions);
+            List<Questions> questions = service.testGenerator(topic);
+            service.sendMail(topic, questions);
         }, dateTime);
-        Status status=new Status("scheduled", testRequested.getTopic());
-
+        
+        Status status = new Status("scheduled", testRequested.getTopic());
         return new ResponseEntity<>(status, HttpStatus.OK);
     }
-
 
     @DeleteMapping("/schedule")
     public ResponseEntity<Status> stopTest(){
         boolean stopped = dynamicScheduler.stop();
         topic = "";
         if(stopped) {
-            Status status=new Status("success","Scheduled test stopped successfully");
+            Status status = new Status("success", "Scheduled test stopped successfully");
             return new ResponseEntity<>(status, HttpStatus.OK);
         } else {
             return null;
