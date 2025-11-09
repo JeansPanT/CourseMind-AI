@@ -25,7 +25,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex flex-col transition-all">
       <Header currentSection={currentSection} onNavigate={setCurrentSection} />
       <main className="py-8 px-4 sm:px-6 lg:px-8 flex-1">
         {renderSection()}
